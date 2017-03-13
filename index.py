@@ -65,10 +65,12 @@ def register():
         db.session.commit()
         
         response = {"id": user.id}
+        response.status_code = 201
         
     except Exception as e:
-        return make_error_json("ユーザ名は既に使用されています")
-        #return make_error_json(str(type(e)))
+        response = make_error_json("ユーザ名は既に使用されています")
+        response.status_code = 403
+        
         
     return make_data_json(response)
 
