@@ -6,11 +6,12 @@ from flask_sqlalchemy import SQLAlchemy
 import hashlib
 from datetime import datetime
 import sqlite3
+from os.path import abspath, dirname, join
 
 
 # global variables
 app = Flask('inspix')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + join(dirname(abspath(__file__)), 'database.db')
 app.config['JSON_AS_ASCII'] = False 
 db = SQLAlchemy(app)
 
@@ -57,7 +58,6 @@ def make_data_json(data):
     
 @app.route('/register', methods=['POST'])
 def register():
-    response = dict()
     try:
         jsondata = request.json
         user = User(jsondata['name'],  jsondata['password'])
