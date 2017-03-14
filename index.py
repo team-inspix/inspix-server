@@ -25,6 +25,10 @@ followers = db.Table('followers',
                            db.Column('from_id', db.Integer, db.ForeignKey('users.id'), nullable=False),
                            db.Column('to_id', db.Integer, db.ForeignKey('users.id'), nullable=False))
 
+kininaru_relation = db.Table('kininaru',
+                    db.Column('from_id', db.Integer, db.ForeignKey('users.id'), nullable=False),
+                    db.Column('to_id', db.Integer, db.ForeignKey('inspirations.id'), nullable=False))
+
 # Models
 class User(db.Model):
     __tablename__ = "users"
@@ -39,6 +43,7 @@ class User(db.Model):
                                 secondaryjoin=(id==followers.c.to_id),
                                 backref=db.backref('followers', lazy='dynamic'),
                                 lazy='dynamic')
+    kininari = db.relationship('Inspiration', secondary= kininaru_relation, backref='kininatteru', lazy='dynamic')
     
     def __init__(self, name, password, face_image=default_image_url):
         self.name = name
@@ -62,7 +67,18 @@ class User(db.Model):
     def unfollow_user(self, user):
         if self.is_following_user(user):
             self.followed.remove(user)
-
+            
+    def is_kininatteru(self, inspiration):
+        return self.kininari.filter(Inspiration.id == kininaru_relation.c.to_id).count() > 0
+    
+    def kininaru(self, inspiration):
+        if not self.is_kininatteru(inspiration):
+            self.kininari.append(inspiration)
+            
+    def unkininaru(self, inspiration):
+        if self.is_kininatteru(inspiration):
+            self.kininari.remove(inspiration)
+            
 class Inspiration(db.Model):
     __tablename__ = 'inspirations'
     id = db.Column(db.Integer, primary_key=True)
@@ -175,6 +191,28 @@ def postInspiration():
         pass
     return make_error_json("予期しないエラーです"), 500
 
+@app.route('/kininaru', methods=['PUT', 'DELETE'])
+def kininaru():
+    try:
+        #if not is_user_login():
+        #    return make_error_json("ログインする必要があります"), 403
+        jsondata = request.json
+        #jsondata["author_id"] = session["user_id"]
+        user = get_login_user()
+        to_inspiration = Inspiration.query.filter(Inspiration.id==jsondata['inspiration_id']).first()
+        
+        if request.method == 'PUT':
+            user.kininaru(to_inspiration)
+            db.session.commit()
+            return make_data_json({}), 200        
+        elif request.method == 'DELETE':
+            user.unkininaru(to_inspiration)
+            db.session.commit()
+            return make_data_json({}), 200
+    except Exception as e:
+        pass
+    
+    return make_error_json('予期しないエラーです'), 500
 
 
 @app.route('/follow', methods=['PUT', 'DELETE'])
