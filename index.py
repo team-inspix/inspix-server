@@ -29,6 +29,7 @@ class User(db.Model):
     password = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime)
     face_image = db.Column(db.String)
+    inspirations = db.relationship('Inspiration', backref='user', lazy='dynamic')
     
     def __init__(self, username, password, face_image=default_image_url):
         self.username = username
