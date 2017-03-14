@@ -59,6 +59,9 @@ def make_data_json(data):
     }
     return jsonify(json)
 
+def is_user_login():
+    return 'user_id' in session
+
 
 @app.route('/login', methods=['POST'])
 def login():
