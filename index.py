@@ -21,18 +21,27 @@ db = SQLAlchemy(app)
 default_image_url = 'https://theoldmoon0602.tk/bin/theoldmoon0602.png'
 password_salt = 'INSPIX_VULNERABLE_SALT'
 
+followers = db.Table('followers', 
+                           db.Column('from_id', db.Integer, db.ForeignKey('users.id'), nullable=False),
+                           db.Column('to_id', db.Integer, db.ForeignKey('users.id'), nullable=False))
+
 # Models
 class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String, nullable=False)
+    name = db.Column(db.String, nullable=False)
     password = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime)
     face_image = db.Column(db.String)
     inspirations = db.relationship('Inspiration', backref='user', lazy='dynamic')
+    followed = db.relationship('User', secondary= followers,
+                                primaryjoin=(id==followers.c.from_id),
+                                secondaryjoin=(id==followers.c.to_id),
+                                backref=db.backref('followers', lazy='dynamic'),
+                                lazy='dynamic')
     
-    def __init__(self, username, password, face_image=default_image_url):
-        self.username = username
+    def __init__(self, name, password, face_image=default_image_url):
+        self.name = name
         self.face_image = face_image
         self.password = self.generate_password(password)
         self.created_at = datetime.utcnow()
@@ -42,6 +51,17 @@ class User(db.Model):
         
     def check_password(self, password):
         return self.password == self.generate_password(password)
+    
+    def is_following_user(self, user):
+        return self.followed.filter(user.id == followers.c.to_id).count() > 0
+    
+    def follow_user(self, user):
+        if not self.is_following_user(user):
+            self.followed.append(user)
+    
+    def unfollow_user(self, user):
+        if self.is_following_user(user):
+            self.followed.remove(user)
 
 class Inspiration(db.Model):
     __tablename__ = 'inspirations'
@@ -100,6 +120,10 @@ def make_data_json(data):
 def is_user_login():
     return 'user_id' in session
 
+def get_login_user():
+    return User.query.filter(User.id==1).first()
+    # return User.query.filter(id == session['user_id']).first()
+
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -150,6 +174,34 @@ def postInspiration():
     except Exception as e:
         pass
     return make_error_json("予期しないエラーです"), 500
+
+
+
+@app.route('/follow', methods=['PUT', 'DELETE'])
+def follow():
+    try:
+        #if not is_user_login():
+        #    return make_error_json("ログインする必要があります"), 403
+        jsondata = request.json
+        #jsondata["author_id"] = session["user_id"]
+        user = get_login_user()
+        to_user = User.query.filter(User.id==jsondata['user_id']).first()
+        
+        if user.id == to_user.id:
+            return make_error_json("予期しないエラーです"), 500
+        
+        if request.method == 'PUT':
+            user.follow_user(to_user)
+            db.session.commit()
+            return make_data_json({}), 200        
+        elif request.method == 'DELETE':
+            user.unfollow_user(to_user)
+            db.session.commit()
+            return make_data_json({}), 200
+    except Exception as e:
+        pass
+    
+    return make_error_json('予期しないエラーです'), 500
 
 if __name__ == '__main__':
     app.run(port=5001)
