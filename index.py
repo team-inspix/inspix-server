@@ -48,7 +48,9 @@ class User(db.Model):
                                 secondaryjoin=(id==followers.c.to_id),
                                 backref=db.backref('followers', lazy='dynamic'),
                                 lazy='dynamic')
-    kininari = db.relationship('Inspiration', secondary= kininaru_relation, backref='kininatteru', lazy='dynamic')
+    kininari = db.relationship('Inspiration', secondary=kininaru_relation,
+                               backref=db.backref('kininarare', lazy='dynamic'),
+                               lazy='dynamic')
     
     def __init__(self, name, password, face_image=default_image_url):
         self.name = name
@@ -74,7 +76,9 @@ class User(db.Model):
             self.followed.remove(user)
             
     def is_kininatteru(self, inspiration):
-        return self.kininari.filter(Inspiration.id == kininaru_relation.c.to_id).count() > 0
+        # TOO TOO LATE! TOO TOO LATE! TOO TOO P P P ComeOn...
+        return inspiration.id in [v.id for v in self.kininari.all()]
+        # return self.kininari.filter(Inspiration.id == kininaru_relation.c.to_id).count() > 0
     
     def kininaru(self, inspiration):
         if not self.is_kininatteru(inspiration):
@@ -139,6 +143,7 @@ class Inspiration(db.Model):
         return jsonifiable object
         """
         retdict = {
+            'id': self.id,
             'base_image_url': self.base_image_url,
             'background_image_url': self.background_image_url,
             'composited_image_url': self.composited_image_url,
@@ -159,6 +164,10 @@ class Inspiration(db.Model):
         
         if self.is_nokkari:
             retdict['nokkari_from'] = self.nokkari_from.jsonable()
+            
+        retdict['kininatteru'] = get_login_user().is_kininatteru(self)
+        retdict['kininaru_users'] = [u.user_digest() for u in self.kininarare]
+        retdict['kininaru_count'] = self.kininarare.count()
         
         return retdict
         
@@ -245,7 +254,6 @@ def kininaru():
         #if not is_user_login():
         #    return make_error_json("ログインする必要があります"), 403
         jsondata = request.json
-        #jsondata["author_id"] = session["user_id"]
         user = get_login_user()
         to_inspiration = Inspiration.query.filter(Inspiration.id==jsondata['inspiration_id']).first()
         
@@ -291,14 +299,23 @@ def follow():
 
 @app.route('/followTimeline', methods=['GET'])
 def followTimeline():
-    #if not is_user_login():
-    #    return make_error_json("ログインする必要があります"), 403
-    #jsondata = request.json
-    #jsondata["author_id"] = session["user_id"]
-    user = get_login_user() #type: User
-    followed_ids = [followed.id for followed in user.followed]
-    inspirations = Inspiration.query.filter(Inspiration.author_id.in_(followed_ids)).order_by(Inspiration.created_at.desc()).all()
-    return make_data_json({"Inspirations": [v.jsonable() for v in inspirations]}), 200
+    try:
+        #if not is_user_login():
+        #    return make_error_json("ログインする必要があります"), 403
+        jsondata = request.json
+        #jsondata["author_id"] = session["user_id"]
+        user = get_login_user() #type: User
+        followed_ids = [followed.id for followed in user.followed]
+        inspirations = Inspiration.query.filter(
+            Inspiration.author_id.in_(followed_ids)).\
+            order_by(Inspiration.created_at.desc()).\
+            paginate(page=int(jsondata["page"]), per_page=10, error_out=False).items
+        return make_data_json({"Inspirations": [v.jsonable() for v in inspirations]}), 200
+    except Exception as e:
+        pass
+
+    
+    return make_error_json('予期しないエラーです'), 500
     
 
 if __name__ == '__main__':
