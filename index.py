@@ -2,11 +2,13 @@
 from __future__ import unicode_literals
 
 from flask import Flask, request, jsonify, session
+from flask.json import JSONEncoder
 from flask_sqlalchemy import SQLAlchemy
 import hashlib
 from datetime import datetime
 import sqlite3
 from os.path import abspath, dirname, join
+import time
 
 
 # global variables
@@ -29,15 +31,18 @@ kininaru_relation = db.Table('kininaru',
                     db.Column('from_id', db.Integer, db.ForeignKey('users.id'), nullable=False),
                     db.Column('to_id', db.Integer, db.ForeignKey('inspirations.id'), nullable=False))
 
+def to_timestamp(dt):
+    return int(time.mktime(dt.timetuple()))
+
 # Models
 class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
+    name = db.Column(db.String, nullable=False, unique=True)
     password = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime)
     face_image = db.Column(db.String)
-    inspirations = db.relationship('Inspiration', backref='user', lazy='dynamic')
+    inspirations = db.relationship('Inspiration', backref='author', lazy='dynamic')
     followed = db.relationship('User', secondary= followers,
                                 primaryjoin=(id==followers.c.from_id),
                                 secondaryjoin=(id==followers.c.to_id),
@@ -79,6 +84,15 @@ class User(db.Model):
         if self.is_kininatteru(inspiration):
             self.kininari.remove(inspiration)
             
+    def user_digest(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "thumbnail_image": self.face_image
+        }
+        
+        
+            
 class Inspiration(db.Model):
     __tablename__ = 'inspirations'
     id = db.Column(db.Integer, primary_key=True)
@@ -95,12 +109,13 @@ class Inspiration(db.Model):
     comment = db.Column(db.String)
     is_nokkari = db.Column(db.Boolean)
     author_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    nokkari_from = db.Column(db.Integer, db.ForeignKey("inspirations.id"))
+    nokkari_from_id = db.Column(db.Integer, db.ForeignKey("inspirations.id"))
+    nokkari_from = db.relationship('Inspiration', uselist=False)
     created_at = db.Column(db.DateTime)
     
     def __init__(self, base_image_url, background_image_url, composited_image_url, caption, captured_time, author_id,
                  weather=None, temperature=None, longitude=None, latitude=None,
-                 comment="", is_nokkari=False, nokkari_from=None):
+                 comment="", nokkari_from_id=None):
         self.base_image_url = base_image_url
         self.background_image_url = background_image_url
         self.composited_image_url = composited_image_url
@@ -112,12 +127,42 @@ class Inspiration(db.Model):
         self.longitude = longitude
         self.latitude = latitude
         self.comment = comment
-        self.is_nokkari = is_nokkari
-        self.nokkari_from = nokkari_from
+        self.is_nokkari = False
         self.created_at = datetime.utcnow()
+        if nokkari_from_id:
+            self.is_nokkari = True
+            self.nokkari_from_id = nokkari_from_id
+            self.nokkari_from = Inspiration.query.filter(Inspiration.id == nokkari_from_id).first()
+        
+    def jsonable(self):
+        """
+        return jsonifiable object
+        """
+        retdict = {
+            'base_image_url': self.base_image_url,
+            'background_image_url': self.background_image_url,
+            'composited_image_url': self.composited_image_url,
+            'caption': self.caption,
+            'captured_time': to_timestamp(self.captured_time),
+            'created_at': to_timestamp(self.created_at),
+            'author': self.author.user_digest()
+        }
+        
+        if self.weather:
+            retdict['weather'] = self.weather
+        if self.temperature:
+            retdict['temperature'] = self.temperature
+        if self.longitude:
+            retdict['longitude'] = self.longitude
+        if self.latitude:
+            retdict['latitude'] = self.latitude
+        
+        if self.is_nokkari:
+            retdict['nokkari_from'] = self.nokkari_from.jsonable()
+        
+        return retdict
         
         
-    
     
 def make_error_json(errorstr):
     json = {
@@ -243,6 +288,18 @@ def follow():
         pass
     
     return make_error_json('予期しないエラーです'), 500
+
+@app.route('/followTimeline', methods=['GET'])
+def followTimeline():
+    #if not is_user_login():
+    #    return make_error_json("ログインする必要があります"), 403
+    #jsondata = request.json
+    #jsondata["author_id"] = session["user_id"]
+    user = get_login_user() #type: User
+    followed_ids = [followed.id for followed in user.followed]
+    inspirations = Inspiration.query.filter(Inspiration.author_id.in_(followed_ids)).order_by(Inspiration.created_at.desc()).all()
+    return make_data_json({"Inspirations": [v.jsonable() for v in inspirations]}), 200
+    
 
 if __name__ == '__main__':
     app.run(port=5001)
