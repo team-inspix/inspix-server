@@ -374,17 +374,15 @@ def randstr(l):
 @app.route('/imageUpload', methods=['PUT'])
 def imageUpload():
     """ this method is very very insecure """
-    try:
-        bindir = join(dirname(abspath(__file__)), "bin")
-        jsondata = request.json
-        name = randstr(20)+"."+jsondata["ext"]
-        fname = join(bindir, name)
-        with open(fname, 'wb') as f:
-            f.write(base64.b64decode(jsondata["bin"]))
-        return make_data_json({"file_url": join(request.url_root, fname)}), 201
-    except Exception as e:
-        pass
-    return make_error_json('予期しないエラーです'), 500
+
+    bindir = join(dirname(abspath(__file__)), "bin")
+    jsondata = request.json
+    name = randstr(20)+"."+jsondata["ext"]
+    fname = join(bindir, name)
+    with open(fname, 'wb') as f:
+        f.write(base64.b64decode(jsondata["bin"]))
+    return make_data_json({"file_url": join("https://theoldmoon0602.tk/inspix-server", name)}), 201
+
 
 
 
