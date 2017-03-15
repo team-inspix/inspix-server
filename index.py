@@ -140,6 +140,9 @@ def get_login_user():
     return User.query.filter(User.id==1).first()
     # return User.query.filter(id == session['user_id']).first()
 
+@app.route('/testlogin', methods=['GET'])
+def test_login():
+    return make_data_json({'is_login': is_user_login()}), 200
 
 @app.route('/login', methods=['POST'])
 def login():
