@@ -114,29 +114,33 @@ class Inspiration(db.Model):
     is_nokkari = db.Column(db.Boolean)
     author_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     nokkari_from_id = db.Column(db.Integer, db.ForeignKey("inspirations.id"))
-    nokkari_from = db.relationship('Inspiration', uselist=False)
+    nokkari_from = db.relationship('Inspiration', backref='nokkarare', remote_side=[id])
     created_at = db.Column(db.DateTime)
     
-    def __init__(self, base_image_url, background_image_url, composited_image_url, caption, captured_time, author_id,
-                 weather=None, temperature=None, longitude=None, latitude=None,
-                 comment="", nokkari_from_id=None):
+    def __init__(self, base_image_url, background_image_url, composited_image_url, caption, author_id,
+                 captured_time=None, weather=None, temperature=None, longitude=None, latitude=None,
+                 nokkari_from=None):
         self.base_image_url = base_image_url
         self.background_image_url = background_image_url
         self.composited_image_url = composited_image_url
         self.caption = caption
-        self.captured_time = datetime.fromtimestamp(float(captured_time))
+        if captured_time:
+            self.captured_time = datetime.fromtimestamp(float(captured_time))
+        else:
+            self.captured_time = None
+            
         self.author_id = author_id
         self.weather = weather
         self.temperature = temperature
         self.longitude = longitude
         self.latitude = latitude
-        self.comment = comment
-        self.is_nokkari = False
         self.created_at = datetime.utcnow()
-        if nokkari_from_id:
+        
+        self.is_nokkari = False
+        
+        if nokkari_from:
             self.is_nokkari = True
-            self.nokkari_from_id = nokkari_from_id
-            self.nokkari_from = Inspiration.query.filter(Inspiration.id == nokkari_from_id).first()
+            self.nokkari_from = nokkari_from
         
     def jsonable(self):
         """
@@ -162,8 +166,10 @@ class Inspiration(db.Model):
         if self.latitude:
             retdict['latitude'] = self.latitude
         
-        if self.is_nokkari:
-            retdict['nokkari_from'] = self.nokkari_from.jsonable()
+        #if self.is_nokkari:
+        #    retdict['nokkari_from'] = self.nokkari_from.jsonable()
+         
+        retdict['nokkarare'] = [i.jsonable() for i in self.nokkarare]
             
         retdict['kininatteru'] = get_login_user().is_kininatteru(self)
         retdict['kininaru_users'] = [u.user_digest() for u in self.kininarare]
@@ -247,6 +253,30 @@ def postInspiration():
     except Exception as e:
         pass
     return make_error_json("予期しないエラーです"), 500
+
+@app.route('/nokkari', methods=['POST'])
+def nokkari():
+    #if not is_user_login():
+    #    return make_error_json("ログインする必要があります"), 403
+    jsondata = request.json
+    #jsondata["author_id"] = session["user_id"]
+    jsondata["author_id"] = "1"
+    nokkari_from = Inspiration.query.filter(Inspiration.id == jsondata["nokkari_from_id"]).first() #type: Inspiration
+    jsondata["nokkari_from"] = nokkari_from
+    jsondata["background_image_url"] = nokkari_from.background_image_url
+    jsondata.pop("nokkari_from_id", None)
+    inspiration = Inspiration(**jsondata)
+    db.session.add(inspiration)
+    db.session.commit()
+    
+    return make_data_json({}), 200
+
+def userTimeline(user_id, page):
+    inspirations = Inspiration.query.filter(Inspiration.author_id == user_id).\
+        filter(Inspiration.is_nokkari == False).\
+        order_by(Inspiration.created_at.desc()).\
+        paginate(page=int(page), per_page=10, error_out=False).items
+    return inspirations
 
 @app.route('/kininaru', methods=['PUT', 'DELETE'])
 def kininaru():
