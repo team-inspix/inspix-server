@@ -9,6 +9,10 @@ from datetime import datetime
 import sqlite3
 from os.path import abspath, dirname, join
 import time
+import random
+import string
+import base64
+
 
 
 # global variables
@@ -362,6 +366,27 @@ def followTimeline():
     
     return make_error_json('予期しないエラーです'), 500
     
+    
+def randstr(l):
+    return "".join([random.choice(string.ascii_letters) for i in range(l)])
+
+    
+@app.route('/imageUpload', methods=['PUT'])
+def imageUpload():
+    """ this method is very very insecure """
+    try:
+        bindir = join(dirname(abspath(__file__)), "bin")
+        jsondata = request.json
+        name = randstr(20)+"."+jsondata["ext"]
+        fname = join(bindir, name)
+        with open(fname, 'wb') as f:
+            f.write(base64.b64decode(jsondata["bin"]))
+        return make_data_json({"file_url": join(request.url_root, fname)}), 201
+    except Exception as e:
+        pass
+    return make_error_json('予期しないエラーです'), 500
+
+
 
 if __name__ == '__main__':
     app.run(port=5001)
