@@ -381,7 +381,7 @@ def imageUpload():
     fname = join(bindir, name)
     with open(fname, 'wb') as f:
         f.write(base64.b64decode(jsondata["bin"]))
-    return make_data_json({"file_url": join("https://theoldmoon0602.tk/inspix-server", name)}), 201
+    return make_data_json({"file_url": join("https://theoldmoon0602.tk/inspix-server/bin", name)}), 201
 
 
 
