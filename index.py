@@ -152,10 +152,12 @@ class Inspiration(db.Model):
             'background_image_url': self.background_image_url,
             'composited_image_url': self.composited_image_url,
             'caption': self.caption,
-            'captured_time': to_timestamp(self.captured_time),
             'created_at': to_timestamp(self.created_at),
             'author': self.author.user_digest()
         }
+        
+        if self.captured_time:
+            retdict['captured_time'] = to_timestamp(self.captured_time)
         
         if self.weather:
             retdict['weather'] = self.weather
@@ -166,9 +168,6 @@ class Inspiration(db.Model):
         if self.latitude:
             retdict['latitude'] = self.latitude
         
-        #if self.is_nokkari:
-        #    retdict['nokkari_from'] = self.nokkari_from.jsonable()
-         
         retdict['nokkarare'] = [i.jsonable() for i in self.nokkarare]
             
         retdict['kininatteru'] = get_login_user().is_kininatteru(self)
@@ -256,20 +255,36 @@ def postInspiration():
 
 @app.route('/nokkari', methods=['POST'])
 def nokkari():
-    #if not is_user_login():
-    #    return make_error_json("ログインする必要があります"), 403
-    jsondata = request.json
-    #jsondata["author_id"] = session["user_id"]
-    jsondata["author_id"] = "1"
-    nokkari_from = Inspiration.query.filter(Inspiration.id == jsondata["nokkari_from_id"]).first() #type: Inspiration
-    jsondata["nokkari_from"] = nokkari_from
-    jsondata["background_image_url"] = nokkari_from.background_image_url
-    jsondata.pop("nokkari_from_id", None)
-    inspiration = Inspiration(**jsondata)
-    db.session.add(inspiration)
-    db.session.commit()
-    
-    return make_data_json({}), 200
+    try:
+        #if not is_user_login():
+        #    return make_error_json("ログインする必要があります"), 403
+        jsondata = request.json
+        #jsondata["author_id"] = session["user_id"]
+        jsondata["author_id"] = "1"
+        nokkari_from = Inspiration.query.filter(Inspiration.id == jsondata["nokkari_from_id"]).first() #type: Inspiration
+        jsondata["nokkari_from"] = nokkari_from
+        jsondata["background_image_url"] = nokkari_from.background_image_url
+        jsondata.pop("nokkari_from_id", None)
+        inspiration = Inspiration(**jsondata)
+        db.session.add(inspiration)
+        db.session.commit()
+        
+        return make_data_json({}), 200
+    except Exception as e:
+        pass
+    return make_error_json('予期しないエラーです'), 500
+
+
+@app.route('/userTimeline', methods=['GET'])
+def userTimeline_Route():
+    try:
+        jsondata = request.json
+        items = [v.jsonable() for v in userTimeline(jsondata['user_id'], jsondata['page'])]
+        return make_data_json({"Inspirations": items}), 200
+    except Exception as e:
+        pass
+    return make_error_json('予期しないエラーです'), 500
+
 
 def userTimeline(user_id, page):
     inspirations = Inspiration.query.filter(Inspiration.author_id == user_id).\
