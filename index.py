@@ -113,6 +113,7 @@ class Inspiration(db.Model):
     latitude = db.Column(db.Float)
     caption = db.Column(db.String)
     captured_time = db.Column(db.DateTime)
+    title = db.Column(db.String)
     
     comment = db.Column(db.String)
     is_nokkari = db.Column(db.Boolean)
@@ -122,8 +123,9 @@ class Inspiration(db.Model):
     created_at = db.Column(db.DateTime)
     
     def __init__(self, base_image_url, background_image_url, composited_image_url, caption, author_id,
+                 title=None,
                  captured_time=None, weather=None, temperature=None, longitude=None, latitude=None,
-                 nokkari_from=None):
+                 nokkari_from=None, **kwargs):
         self.base_image_url = base_image_url
         self.background_image_url = background_image_url
         self.composited_image_url = composited_image_url
@@ -139,6 +141,7 @@ class Inspiration(db.Model):
         self.longitude = longitude
         self.latitude = latitude
         self.created_at = datetime.utcnow()
+        self.title = title
         
         self.is_nokkari = False
         
