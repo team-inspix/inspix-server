@@ -4,7 +4,6 @@ from __future__ import unicode_literals
 from flask import Flask, request, jsonify, session
 from flask.json import JSONEncoder
 from flask_sqlalchemy import SQLAlchemy
-import hashlib
 from datetime import datetime
 import sqlite3
 from os.path import abspath, dirname, join
@@ -12,6 +11,7 @@ import time
 import random
 import string
 import base64
+import hashlib
 
 
 
@@ -99,8 +99,6 @@ class User(db.Model):
             "thumbnail_image": self.face_image
         }
         
-        
-            
 class Inspiration(db.Model):
     __tablename__ = 'inspirations'
     id = db.Column(db.Integer, primary_key=True)
@@ -250,7 +248,10 @@ def userTimeline_impl(jsondata):
         filter(Inspiration.is_nokkari == False).\
         order_by(Inspiration.created_at.desc()).\
         paginate(page=int(page), per_page=10, error_out=False).items
-    return inspirations
+    user = User.query.filter(User.id == user_id).first() # type: User
+    digest = user.user_digest()
+    digest["following"] = get_login_user().is_following_user(user)
+    return inspirations, digest
 
 def randstr(l):
     return "".join([random.choice(string.ascii_letters) for i in range(l)])
@@ -270,6 +271,16 @@ def followTimeline_impl(jsondata):
         Inspiration.author_id.in_(followed_ids)).\
         order_by(Inspiration.created_at.desc()).\
         paginate(page=int(jsondata["page"]), per_page=10, error_out=False).items
+    return inspirations
+
+# 
+#def pickupTimeline_impl(jsondata):
+    #Inspiration.query.filter(Inspiration.is_nokkari==False).\
+        #order_by(func.count(Inspiration.
+
+def pickupTimeline_impl(jsondata):
+    inspirations = Inspiration.query.order_by(Inspiration.created_at.desc()).all()
+    #paginate(page=int(jsondata["page"]), per_page=10, error_out=False).items
     return inspirations
 
 # route
@@ -328,14 +339,16 @@ def nokkari():
     return make_error_json('予期しないエラーです'), 500
 
 def array_jsonable(arr):
-    return [arr.jsonable() for v in arr]
+    return [v.jsonable() for v in arr]
 
 @app.route('/userTimeline', methods=['GET'])
 def userTimeline():
     try:
         jsondata = request.json
-        inspitraions = array_jsonable(userTimeline_impl(jsondata))
-        return make_data_json({"Inspirations": inspitraions}), 200
+        inspitraions, user = userTimeline_impl(jsondata)
+        inspitraions = array_jsonable(inspirations)
+        
+        return make_data_json({"user": user, "Inspirations": inspitraions}), 200
     except Exception as e:
         pass
     return make_error_json('予期しないエラーです'), 500
@@ -402,7 +415,17 @@ def followTimeline():
     except Exception as e:
         pass
     
-    return make_error_json('予期しないエラーです'), 500    
+    return make_error_json('予期しないエラーです'), 500   
+
+@app.route('/pickupTimeline', methods=['GET'])
+def pickupTimeline():
+    try:
+        inspirations = array_jsonable(pickupTimeline_impl(request.json))
+        return make_data_json({"Inspirations": inspirations}), 200
+    except Exception as e:
+        pass
+    return make_error_json('予期しないエラーです'), 500 
+
     
 @app.route('/imageUpload', methods=['PUT'])
 def imageUpload():
