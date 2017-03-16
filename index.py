@@ -14,6 +14,7 @@ import base64
 import hashlib
 import requests
 import json
+import traceback
 
 
 
@@ -29,7 +30,7 @@ bluemix_user_password = "a:b"
 
 def errorlog(e):
     f = join(dirname(__file__), "error.log")
-    open(f, "a").write(e.format_exc()+"\n")
+    open(f, "a").write(e.message+"::"+traceback.format_exc()+"\n")
 
 # constants
 default_image_url = 'https://theoldmoon0602.tk/bin/theoldmoon0602.png'
