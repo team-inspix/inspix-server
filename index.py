@@ -56,7 +56,7 @@ class User(db.Model):
                                backref=db.backref('kininarare', lazy='dynamic'),
                                lazy='dynamic')
     
-    def __init__(self, name, password, face_image=default_image_url):
+    def __init__(self, name, password, face_image=default_image_url, **kwargs):
         self.name = name
         self.face_image = face_image
         self.password = self.generate_password(password)
@@ -206,6 +206,70 @@ def get_login_user():
     return User.query.filter(User.id==1).first()
     # return User.query.filter(id == session['user_id']).first()
 
+
+# impls
+def login_impl(jsondata):
+    user = User.query.filter_by(id=jsondata['id']).first()
+    
+    if not user.check_password(jsondata['password']):
+        return make_error_json("ログインに失敗しました"), 403
+    
+    session['user_id'] = user.id
+    return True
+
+def register_impl(jsondata):
+    user = User(jsondata['name'],  jsondata['password'])
+    db.session.add(user)
+    db.session.commit()
+
+    return user.id
+
+def postInspiration_impl(jsondata):  
+    jsondata["author_id"] = "1"
+    inspiration = Inspiration(**jsondata)
+    db.session.add(inspiration)
+    db.session.commit()
+
+def nokkari_impl(jsondata):
+    nokkari_from = Inspiration.query.filter(Inspiration.id == jsondata["nokkari_from_id"]).first() #type: Inspiration
+    jsondata["nokkari_from"] = nokkari_from
+    jsondata["background_image_url"] = nokkari_from.background_image_url
+    jsondata.pop("nokkari_from_id", None)
+    inspiration = Inspiration(**jsondata)
+    db.session.add(inspiration)
+    db.session.commit()    
+
+def userTimeline_impl(jsondata):
+    user_id = jsondata['user_id']
+    page = jsondata['page']
+    inspirations = Inspiration.query.filter(Inspiration.author_id == user_id).\
+        filter(Inspiration.is_nokkari == False).\
+        order_by(Inspiration.created_at.desc()).\
+        paginate(page=int(page), per_page=10, error_out=False).items
+    return inspirations
+
+def randstr(l):
+    return "".join([random.choice(string.ascii_letters) for i in range(l)])
+
+def imageUpload_impl(jsondata, url="https://theoldmoon0602.tk/inspix-server/bin"):
+    bindir = join(dirname(abspath(__file__)), "bin")
+    name = randstr(20)+"."+jsondata["ext"]
+    fname = join(bindir, name)
+    with open(fname, 'wb') as f:
+        f.write(base64.b64decode(jsondata["bin"]))
+    return join(url, name)
+
+def followTimeline_impl(jsondata):
+    user = get_login_user() #type: User
+    followed_ids = [followed.id for followed in user.followed]
+    inspirations = Inspiration.query.filter(
+        Inspiration.author_id.in_(followed_ids)).\
+        order_by(Inspiration.created_at.desc()).\
+        paginate(page=int(jsondata["page"]), per_page=10, error_out=False).items
+    return inspirations
+
+# route
+
 @app.route('/testlogin', methods=['GET'])
 def test_login():
     return make_data_json({'is_login': is_user_login()}), 200
@@ -213,14 +277,9 @@ def test_login():
 @app.route('/login', methods=['POST'])
 def login():
     try:
-        jsondata = request.json
-        user = User.query.filter_by(id=jsondata['id']).first()
+        is_logined = login_impl(request.json)
         
-        if not user.check_password(jsondata['password']):
-            return make_error_json("ログインに失敗しました"), 403
-        
-        session['user_id'] = user.id
-        return make_data_json({"result": True}), 200
+        return make_data_json({"result": is_logined}), 200
         
     except Exception as e:
         pass
@@ -229,17 +288,10 @@ def login():
 @app.route('/register', methods=['POST'])
 def register():
     try:
-        jsondata = request.json
-        user = User(jsondata['name'],  jsondata['password'])
-        db.session.add(user)
-        db.session.commit()
-        
-        response = {"id": user.id}
-        return make_data_json(response), 201
-        
+        user_id = register_impl(request.json)
+        return make_data_json({"id": user_id}), 201
     except Exception as e:
         return make_error_json("ユーザ名は既に使用されています"), 403
-        
         
     return make_error_json("予期しないエラーです"), 500
 
@@ -250,11 +302,7 @@ def postInspiration():
         #    return make_error_json("ログインする必要があります"), 403
         jsondata = request.json
         #jsondata["author_id"] = session["user_id"]
-        jsondata["author_id"] = "1"
-        inspiration = Inspiration(**jsondata)
-        db.session.add(inspiration)
-        db.session.commit()
-        
+        postInspiration_impl(jsondata)        
         return make_data_json(dict()), 200
     except Exception as e:
         pass
@@ -268,37 +316,25 @@ def nokkari():
         jsondata = request.json
         #jsondata["author_id"] = session["user_id"]
         jsondata["author_id"] = "1"
-        nokkari_from = Inspiration.query.filter(Inspiration.id == jsondata["nokkari_from_id"]).first() #type: Inspiration
-        jsondata["nokkari_from"] = nokkari_from
-        jsondata["background_image_url"] = nokkari_from.background_image_url
-        jsondata.pop("nokkari_from_id", None)
-        inspiration = Inspiration(**jsondata)
-        db.session.add(inspiration)
-        db.session.commit()
         
+        nokkari_impl(jsondata)
         return make_data_json({}), 200
     except Exception as e:
         pass
     return make_error_json('予期しないエラーです'), 500
 
+def array_jsonable(arr):
+    return [arr.jsonable() for v in arr]
 
 @app.route('/userTimeline', methods=['GET'])
-def userTimeline_Route():
+def userTimeline():
     try:
         jsondata = request.json
-        items = [v.jsonable() for v in userTimeline(jsondata['user_id'], jsondata['page'])]
-        return make_data_json({"Inspirations": items}), 200
+        inspitraions = array_jsonable(userTimeline_impl(jsondata))
+        return make_data_json({"Inspirations": inspitraions}), 200
     except Exception as e:
         pass
     return make_error_json('予期しないエラーです'), 500
-
-
-def userTimeline(user_id, page):
-    inspirations = Inspiration.query.filter(Inspiration.author_id == user_id).\
-        filter(Inspiration.is_nokkari == False).\
-        order_by(Inspiration.created_at.desc()).\
-        paginate(page=int(page), per_page=10, error_out=False).items
-    return inspirations
 
 @app.route('/kininaru', methods=['PUT', 'DELETE'])
 def kininaru():
@@ -321,7 +357,6 @@ def kininaru():
         pass
     
     return make_error_json('予期しないエラーです'), 500
-
 
 @app.route('/follow', methods=['PUT', 'DELETE'])
 def follow():
@@ -349,42 +384,31 @@ def follow():
     
     return make_error_json('予期しないエラーです'), 500
 
+
+
 @app.route('/followTimeline', methods=['GET'])
 def followTimeline():
     try:
         #if not is_user_login():
         #    return make_error_json("ログインする必要があります"), 403
-        jsondata = request.json
         #jsondata["author_id"] = session["user_id"]
-        user = get_login_user() #type: User
-        followed_ids = [followed.id for followed in user.followed]
-        inspirations = Inspiration.query.filter(
-            Inspiration.author_id.in_(followed_ids)).\
-            order_by(Inspiration.created_at.desc()).\
-            paginate(page=int(jsondata["page"]), per_page=10, error_out=False).items
-        return make_data_json({"Inspirations": [v.jsonable() for v in inspirations]}), 200
+        inspirations = array_jsonable(followTimeline_impl(request.json))
+        
+        return make_data_json({"Inspirations": inspirations}), 200
     except Exception as e:
         pass
-
     
-    return make_error_json('予期しないエラーです'), 500
-    
-    
-def randstr(l):
-    return "".join([random.choice(string.ascii_letters) for i in range(l)])
-
+    return make_error_json('予期しないエラーです'), 500    
     
 @app.route('/imageUpload', methods=['PUT'])
 def imageUpload():
     """ this method is very very insecure """
-
-    bindir = join(dirname(abspath(__file__)), "bin")
-    jsondata = request.json
-    name = randstr(20)+"."+jsondata["ext"]
-    fname = join(bindir, name)
-    with open(fname, 'wb') as f:
-        f.write(base64.b64decode(jsondata["bin"]))
-    return make_data_json({"file_url": join("https://theoldmoon0602.tk/inspix-server/bin", name)}), 201
+    try:
+        fileUrl = imageUpload_impl(request.json)
+        return make_data_json({"file_url": fileUrl}), 201
+    except Exception as e:
+        pass
+    return make_error_json('予期しないエラーです'), 500
 
 
 
