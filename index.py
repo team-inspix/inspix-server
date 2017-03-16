@@ -44,14 +44,15 @@ def to_timestamp(dt):
 
 def getWeatherData(longitude, latitude):
     global bluemix_user_password
-    url = "https://"+bluemix_user_password+"@twcservice.mybluemix.net:443/api/weather/v1/geocode/"+latitude+"/"+longitude+"/forecast/hourly/48hour.json"
+    url = "https://"+bluemix_user_password+"@twcservice.mybluemix.net:443/api/weather/v1/geocode/"+latitude+"/"+longitude+"/forecast/hourly/48hour.json?units=m"
     
     r = requests.get(url)
     data = json.loads(r.text)
     
-    return getDaystateString(data["forecasts"][0])
+    return getDaystateString(data["forecasts"][0]), getTemperature(data["forecasts"][0])
     
-    
+def getTemperature(daystate):
+    return int(daystate["temp"])
 
 def getDaystateString(daystate):
     d = daystate["phrase_32char"]
@@ -169,7 +170,8 @@ class Inspiration(db.Model):
         self.longitude = longitude
         self.latitude = latitude
         if not self.weather and self.longitude and self.latitude:
-            self.weather = getWeatherData(longitude=self.longitude, latitude=self.latitude)
+            self.weather, self.temperature = getWeatherData(longitude=self.longitude, latitude=self.latitude)
+            
         self.created_at = datetime.utcnow()
         self.title = title
         
