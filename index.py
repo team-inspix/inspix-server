@@ -316,6 +316,7 @@ def followTimeline_impl(jsondata):
         paginate(page=int(jsondata["page"]), per_page=10, error_out=False).items
     return inspirations
 
+
 # 
 #def pickupTimeline_impl(jsondata):
     #Inspiration.query.filter(Inspiration.is_nokkari==False).\
@@ -325,6 +326,12 @@ def pickupTimeline_impl(jsondata):
     inspirations = Inspiration.query.order_by(Inspiration.created_at.desc()).all()
     #paginate(page=int(jsondata["page"]), per_page=10, error_out=False).items
     return inspirations
+
+def kininaruList_impl(jsondata):
+    me = get_login_user() # type: User
+    kininaruList = me.kininari.order_by(Inspiration.created_at.desc()).\
+        paginate(page=int(jsondata["page"]), per_page=10, error_out=False).items
+    return kininaruList
 
 # route
 
@@ -482,8 +489,14 @@ def imageUpload():
         errorlog(e)
     return make_error_json('予期しないエラーです'), 500
 
-
-
+@app.route('/kininaruList', methods=['GET'])
+def kininaruList():
+    try:
+        inspirations = array_jsonable(kininaruList_impl(request.json))
+        return make_data_json({"Inspirations": inspirations})
+    except Exception as e:
+        errorlog(e)
+    return make_error_json('予期しないエラーです'), 500
 
 if __name__ == '__main__':
     app.run(port=5001)
