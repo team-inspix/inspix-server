@@ -177,7 +177,10 @@ class Inspiration(db.Model):
         if latitude:
             self.latitude = float(latitude)
         if not self.weather and self.longitude and self.latitude:
-            self.weather, self.temperature = getWeatherData(longitude=self.longitude, latitude=self.latitude)
+            try:
+                self.weather, self.temperature = getWeatherData(longitude=self.longitude, latitude=self.latitude)
+            except Exception as e:
+                errorlog(e)
             
         self.created_at = datetime.utcnow()
         self.title = title
