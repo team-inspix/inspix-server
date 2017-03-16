@@ -349,6 +349,7 @@ def register():
         user_id = register_impl(request.json)
         return make_data_json({"id": user_id}), 201
     except Exception as e:
+        errorlog(e)
         return make_error_json("ユーザ名は既に使用されています"), 403
         
     return make_error_json("予期しないエラーです"), 500
