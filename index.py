@@ -174,7 +174,11 @@ class Inspiration(db.Model):
             retdict['longitude'] = self.longitude
         if self.latitude:
             retdict['latitude'] = self.latitude
-        
+        if self.title:
+            retdict['title'] = self.title
+        else:
+            retdict['title'] = ""
+            
         retdict['nokkarare'] = [i.jsonable() for i in self.nokkarare]
             
         retdict['kininatteru'] = get_login_user().is_kininatteru(self)
