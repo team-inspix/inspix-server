@@ -28,7 +28,7 @@ db = SQLAlchemy(app)
 bluemix_user_password = "a:b"
 
 def errorlog(s):
-    f = "error.log"
+    f = join(dirname(__file__), "error.log")
     open(f, "a").write(s+"\n")
 
 # constants
