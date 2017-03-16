@@ -27,6 +27,10 @@ db = SQLAlchemy(app)
 
 bluemix_user_password = "a:b"
 
+def errorlog(s):
+    f = "error.log"
+    open(f, "a").write(s+"\n")
+
 # constants
 default_image_url = 'https://theoldmoon0602.tk/bin/theoldmoon0602.png'
 password_salt = 'INSPIX_VULNERABLE_SALT'
@@ -261,7 +265,6 @@ def register_impl(jsondata):
     return user.id
 
 def postInspiration_impl(jsondata):  
-    jsondata["author_id"] = "1"
     inspiration = Inspiration(**jsondata)
     db.session.add(inspiration)
     db.session.commit()
@@ -331,7 +334,7 @@ def login():
         return make_data_json({"result": is_logined}), 200
         
     except Exception as e:
-        pass
+        errorlog(e.message)
     return make_error_json("ログインに失敗しました"), 403            
 
 @app.route('/register', methods=['POST'])
@@ -351,10 +354,11 @@ def postInspiration():
         #    return make_error_json("ログインする必要があります"), 403
         jsondata = request.json
         #jsondata["author_id"] = session["user_id"]
+        jsondata["author_id"] = 1
         postInspiration_impl(jsondata)        
         return make_data_json(dict()), 200
     except Exception as e:
-        pass
+        errorlog(e.message)
     return make_error_json("予期しないエラーです"), 500
 
 @app.route('/nokkari', methods=['POST'])
@@ -369,7 +373,7 @@ def nokkari():
         nokkari_impl(jsondata)
         return make_data_json({}), 200
     except Exception as e:
-        pass
+        errorlog(e.message)
     return make_error_json('予期しないエラーです'), 500
 
 def array_jsonable(arr):
@@ -384,7 +388,7 @@ def userTimeline():
         
         return make_data_json({"user": user, "Inspirations": inspitraions}), 200
     except Exception as e:
-        pass
+        errorlog(e.message)
     return make_error_json('予期しないエラーです'), 500
 
 @app.route('/kininaru', methods=['PUT', 'DELETE'])
@@ -405,7 +409,7 @@ def kininaru():
             db.session.commit()
             return make_data_json({}), 200
     except Exception as e:
-        pass
+        errorlog(e.message)
     
     return make_error_json('予期しないエラーです'), 500
 
@@ -431,7 +435,7 @@ def follow():
             db.session.commit()
             return make_data_json({}), 200
     except Exception as e:
-        pass
+        errorlog(e.message)
     
     return make_error_json('予期しないエラーです'), 500
 
@@ -447,7 +451,7 @@ def followTimeline():
         
         return make_data_json({"Inspirations": inspirations}), 200
     except Exception as e:
-        pass
+        errorlog(e.message)
     
     return make_error_json('予期しないエラーです'), 500   
 
@@ -457,7 +461,7 @@ def pickupTimeline():
         inspirations = array_jsonable(pickupTimeline_impl(request.json))
         return make_data_json({"Inspirations": inspirations}), 200
     except Exception as e:
-        pass
+        errorlog(e.message)
     return make_error_json('予期しないエラーです'), 500 
 
     
@@ -468,7 +472,7 @@ def imageUpload():
         fileUrl = imageUpload_impl(request.json)
         return make_data_json({"file_url": fileUrl}), 201
     except Exception as e:
-        pass
+        errorlog(e.message)
     return make_error_json('予期しないエラーです'), 500
 
 
