@@ -49,7 +49,7 @@ def to_timestamp(dt):
 
 def getWeatherData(longitude, latitude):
     global bluemix_user_password
-    url = "https://"+bluemix_user_password+"@twcservice.mybluemix.net:443/api/weather/v1/geocode/"+latitude+"/"+longitude+"/forecast/hourly/48hour.json?units=m"
+    url = "https://"+bluemix_user_password+"@twcservice.mybluemix.net:443/api/weather/v1/geocode/{}/{}/forecast/hourly/48hour.json?units=m".format(latitude, longitude)
     
     r = requests.get(url)
     data = json.loads(r.text)
