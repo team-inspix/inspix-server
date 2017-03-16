@@ -12,6 +12,8 @@ import random
 import string
 import base64
 import hashlib
+import requests
+import json
 
 
 
@@ -22,6 +24,8 @@ app.config['JSON_AS_ASCII'] = False
 app.secret_key = 'INSPIX_VULNERABLE_SECRET'
 
 db = SQLAlchemy(app)
+
+bluemix_user_password = "a:b"
 
 # constants
 default_image_url = 'https://theoldmoon0602.tk/bin/theoldmoon0602.png'
@@ -37,6 +41,31 @@ kininaru_relation = db.Table('kininaru',
 
 def to_timestamp(dt):
     return int(time.mktime(dt.timetuple()))
+
+def getWeatherData(longitude, latitude):
+    global bluemix_user_password
+    url = "https://"+bluemix_user_password+"@twcservice.mybluemix.net:443/api/weather/v1/geocode/"+latitude+"/"+longitude+"/forecast/hourly/48hour.json"
+    
+    r = requests.get(url)
+    data = json.loads(r.text)
+    
+    return getDaystateString(data["forecasts"][0])
+    
+    
+
+def getDaystateString(daystate):
+    d = daystate["phrase_32char"]
+    if "Clear" in d:
+        return "sunny"
+    if "Sunny" in d:
+        return "sunny"
+    if "Cloudy" in d:
+        return "cloudy"
+    if "Rainy" in d:
+        return "rainy"
+    return ""
+
+
 
 # Models
 class User(db.Model):
@@ -120,7 +149,8 @@ class Inspiration(db.Model):
     nokkari_from = db.relationship('Inspiration', backref='nokkarare', remote_side=[id])
     created_at = db.Column(db.DateTime)
     
-    def __init__(self, base_image_url, background_image_url, composited_image_url, caption, author_id,
+    def __init__(self, background_image_url, composited_image_url, caption, author_id,
+                 base_image_url="",
                  title=None,
                  captured_time=None, weather=None, temperature=None, longitude=None, latitude=None,
                  nokkari_from=None, **kwargs):
@@ -138,6 +168,8 @@ class Inspiration(db.Model):
         self.temperature = temperature
         self.longitude = longitude
         self.latitude = latitude
+        if not self.weather and self.longitude and self.latitude:
+            self.weather = getWeatherData(longitude=self.longitude, latitude=self.latitude)
         self.created_at = datetime.utcnow()
         self.title = title
         
