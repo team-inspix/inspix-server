@@ -197,9 +197,9 @@ class Inspiration(db.Model):
         """
         retdict = {
             'id': self.id,
-            'base_image_url': self.base_image_url,
-            'background_image_url': self.background_image_url,
-            'composited_image_url': self.composited_image_url,
+            'base_image_url': self.base_image_url or "",
+            'background_image_url': self.background_image_url or "",
+            'composited_image_url': self.composited_image_url or "",
             'caption': self.caption,
             'created_at': to_timestamp(self.created_at),
             'author': self.author.user_digest()
@@ -250,7 +250,7 @@ def is_user_login():
 
 def get_login_user():
     return User.query.filter(User.id==1).first()
-    # return User.query.filter(id == session['user_id']).first()
+    # return User.query.filter(User.id == session['user_id']).first()
 
 
 # impls
@@ -290,7 +290,7 @@ def userTimeline_impl(jsondata):
     inspirations = Inspiration.query.filter(Inspiration.author_id == user_id).\
         filter(Inspiration.is_nokkari == False).\
         order_by(Inspiration.created_at.desc()).\
-        paginate(page=int(page), per_page=10, error_out=False).items
+        paginate(page=int(page), per_page=100, error_out=False).items
     user = User.query.filter(User.id == user_id).first() # type: User
     digest = user.user_digest()
     digest["following"] = get_login_user().is_following_user(user)
@@ -313,7 +313,7 @@ def followTimeline_impl(jsondata):
     inspirations = Inspiration.query.filter(
         Inspiration.author_id.in_(followed_ids)).\
         order_by(Inspiration.created_at.desc()).\
-        paginate(page=int(jsondata["page"]), per_page=10, error_out=False).items
+        paginate(page=int(jsondata["page"]), per_page=100, error_out=False).items
     return inspirations
 
 # 
@@ -322,8 +322,8 @@ def followTimeline_impl(jsondata):
         #order_by(func.count(Inspiration.
 
 def pickupTimeline_impl(jsondata):
-    inspirations = Inspiration.query.order_by(Inspiration.created_at.desc()).all()
-    #paginate(page=int(jsondata["page"]), per_page=10, error_out=False).items
+    inspirations = Inspiration.query.order_by(Inspiration.created_at.desc()).\
+    paginate(page=int(jsondata["page"]), per_page=100, error_out=False).items
     return inspirations
 
 # route
@@ -357,11 +357,10 @@ def register():
 @app.route('/postInspiration', methods=['POST'])
 def postInspiration():
     try:
-        #if not is_user_login():
-        #    return make_error_json("ログインする必要があります"), 403
+        if not is_user_login():
+            return make_error_json("ログインする必要があります"), 403
         jsondata = request.json
-        #jsondata["author_id"] = session["user_id"]
-        jsondata["author_id"] = 1
+        jsondata["author_id"] = session["user_id"]
         postInspiration_impl(jsondata)        
         return make_data_json(dict()), 200
     except Exception as e:
@@ -371,11 +370,10 @@ def postInspiration():
 @app.route('/nokkari', methods=['POST'])
 def nokkari():
     try:
-        #if not is_user_login():
-        #    return make_error_json("ログインする必要があります"), 403
+        if not is_user_login():
+            return make_error_json("ログインする必要があります"), 403
         jsondata = request.json
-        #jsondata["author_id"] = session["user_id"]
-        jsondata["author_id"] = "1"
+        jsondata["author_id"] = session["user_id"]
         
         nokkari_impl(jsondata)
         return make_data_json({}), 200
@@ -401,8 +399,8 @@ def userTimeline():
 @app.route('/kininaru', methods=['PUT', 'DELETE'])
 def kininaru():
     try:
-        #if not is_user_login():
-        #    return make_error_json("ログインする必要があります"), 403
+        if not is_user_login():
+            return make_error_json("ログインする必要があります"), 403
         jsondata = request.json
         user = get_login_user()
         to_inspiration = Inspiration.query.filter(Inspiration.id==jsondata['inspiration_id']).first()
@@ -423,10 +421,10 @@ def kininaru():
 @app.route('/follow', methods=['PUT', 'DELETE'])
 def follow():
     try:
-        #if not is_user_login():
-        #    return make_error_json("ログインする必要があります"), 403
+        if not is_user_login():
+            return make_error_json("ログインする必要があります"), 403
         jsondata = request.json
-        #jsondata["author_id"] = session["user_id"]
+        jsondata["author_id"] = session["user_id"]
         user = get_login_user()
         to_user = User.query.filter(User.id==jsondata['user_id']).first()
         
@@ -451,9 +449,8 @@ def follow():
 @app.route('/followTimeline', methods=['GET'])
 def followTimeline():
     try:
-        #if not is_user_login():
-        #    return make_error_json("ログインする必要があります"), 403
-        #jsondata["author_id"] = session["user_id"]
+        if not is_user_login():
+            return make_error_json("ログインする必要があります"), 403
         inspirations = array_jsonable(followTimeline_impl(request.json))
         
         return make_data_json({"Inspirations": inspirations}), 200
