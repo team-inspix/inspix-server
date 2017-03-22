@@ -9,14 +9,16 @@ this product includes vulnerability
 you can use docker for deplyoing inspix-server. 
 
 ```
-$ docker build -t inspix .
-$ cat .env
+$ echo "
 INSPIX_DATABASE=database.db
 INSPIX_BLUEMIX_USERNAME=hogehoge
 INSPIX_BULEMIX_PASSWORD=hogehoge
 INSPIX_SECRET=hogehoge
 INSPIX_PASSWORD_SALT=hogehoge
+INSPIX_BINDIR=bin
+" > .env
 
+$ docker build -t inspix .
 $ docker run --env-file .env -p <any port>:5000 inspix
 ```
 
