@@ -15,26 +15,27 @@ import hashlib
 import requests
 import json
 import traceback
+import os
 
 
 
 # global variables
 app = Flask('inspix')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + join(dirname(abspath(__file__)), 'database.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.environ["INSPIX_DB"]
 app.config['JSON_AS_ASCII'] = False 
-app.secret_key = 'INSPIX_VULNERABLE_SECRET'
+app.secret_key = os.environ.get("INSPIX_SECRET", 'INSPIX_VULNERABLE_SECRET')
 
 db = SQLAlchemy(app)
 
-bluemix_user_password = "a:b"
+bluemix_user_password = os.environ["INSPIX_BLUEMIX_USERNAME"] + ":" + os.environ["INSPIX_BLUEMIX_PASSWORD"]
 
 def errorlog(e):
     f = join(dirname(__file__), "error.log")
     open(f, "a").write(e.message+"::"+traceback.format_exc()+"\n")
 
 # constants
-default_image_url = 'https://theoldmoon0602.tk/bin/theoldmoon0602.png'
-password_salt = 'INSPIX_VULNERABLE_SALT'
+default_image_url = os.environ.get("INSPIX_DEFAULT_FACE", "https://raw.githubusercontent.com/team-inspix/inspix-server/master/theoldmoon0602.png")
+password_salt = os.environ.get("INSPIX_PASSWORD_SALT", 'INSPIX_VULNERABLE_SALT')
 
 followers = db.Table('followers', 
                            db.Column('from_id', db.Integer, db.ForeignKey('users.id'), nullable=False),
@@ -299,13 +300,13 @@ def userTimeline_impl(jsondata):
 def randstr(l):
     return "".join([random.choice(string.ascii_letters) for i in range(l)])
 
-def imageUpload_impl(jsondata, url="https://theoldmoon0602.tk/inspix-server/bin"):
+def imageUpload_impl(jsondata):
     bindir = join(dirname(abspath(__file__)), "bin")
     name = randstr(20)+"."+jsondata["ext"]
     fname = join(bindir, name)
     with open(fname, 'wb') as f:
         f.write(base64.b64decode(jsondata["bin"]))
-    return join(url, name)
+    return join(request.url_root, "bin",  name)
 
 def followTimeline_impl(jsondata):
     user = get_login_user() #type: User
@@ -496,4 +497,4 @@ def kininaruList():
     return make_error_json('予期しないエラーです'), 500
 
 if __name__ == '__main__':
-    app.run(port=5001)
+    app.run()
