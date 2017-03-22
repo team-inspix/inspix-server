@@ -16,6 +16,7 @@ import requests
 import json
 import traceback
 import os
+import mimetypes
 
 
 
@@ -503,11 +504,8 @@ def kininaruList():
 @app.route("/"+bindir+"/<path:path>", methods=["GET"])
 def binfile(path):
     global bindir 
-    _, ext = os.path.split(path)
-    mimetype=None
-    if ext == "png":
-	    mimetype="image/png"
-    return send_from_directory(bindir, path, mimetype=mimetype)
+    mime, _ = mimetypes.guess_type(path)
+    return send_from_directory(bindir, path, mimetype=mime)
 
 if __name__ == '__main__':
     db.create_all()
