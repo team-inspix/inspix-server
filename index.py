@@ -1,7 +1,7 @@
 # coding: utf-8
 from __future__ import unicode_literals
 
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, send_from_directory
 from flask.json import JSONEncoder
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
@@ -21,13 +21,14 @@ import os
 
 # global variables
 app = Flask('inspix')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.environ["INSPIX_DB"]
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.environ.get("INSPIX_DB", "database.db")
 app.config['JSON_AS_ASCII'] = False 
 app.secret_key = os.environ.get("INSPIX_SECRET", 'INSPIX_VULNERABLE_SECRET')
 
 db = SQLAlchemy(app)
 
-bluemix_user_password = os.environ["INSPIX_BLUEMIX_USERNAME"] + ":" + os.environ["INSPIX_BLUEMIX_PASSWORD"]
+bluemix_user_password = os.environ.get("INSPIX_BLUEMIX_USERNAME", "") + ":" + os.environ.get("INSPIX_BLUEMIX_PASSWORD", "")
+bindir = os.environ.get("INSPIX_BINDIR", "bin")
 
 def errorlog(e):
     f = join(dirname(__file__), "error.log")
@@ -301,12 +302,15 @@ def randstr(l):
     return "".join([random.choice(string.ascii_letters) for i in range(l)])
 
 def imageUpload_impl(jsondata):
-    bindir = join(dirname(abspath(__file__)), "bin")
+    global bindir
+    d = join(dirname(abspath(__file__)), bindir)
+    if not os.path.exists(d):
+	os.mkdir(d)
     name = randstr(20)+"."+jsondata["ext"]
-    fname = join(bindir, name)
+    fname = join(d, name)
     with open(fname, 'wb') as f:
         f.write(base64.b64decode(jsondata["bin"]))
-    return join(request.url_root, "bin",  name)
+    return join(request.url_root, bindir,  name)
 
 def followTimeline_impl(jsondata):
     user = get_login_user() #type: User
@@ -495,6 +499,15 @@ def kininaruList():
     except Exception as e:
         errorlog(e)
     return make_error_json('予期しないエラーです'), 500
+
+@app.route("/"+bindir+"/<path:path>", methods=["GET"])
+def binfile(path):
+    global bindir 
+    _, ext = os.path.split(path)
+    mimetype=None
+    if ext == "png":
+	    mimetype="image/png"
+    return send_from_directory(bindir, path, mimetype=mimetype)
 
 if __name__ == '__main__':
     db.create_all()
